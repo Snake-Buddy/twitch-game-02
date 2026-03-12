@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twitch Tug-o-War</title>
+    <title>Twitch Tug-o-War Overlay</title>
     <link rel="stylesheet" href="style.css">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -13,8 +12,11 @@
 </head>
 <body>
     <div id="ui-container">
-        <h1 id="status-text">WAITING FOR BATTLE...</h1>
-        <div id="score-board">Player Team: <span id="p-count">0</span> | Monster Team: <span id="m-count">0</span></div>
+        <h1 id="status-text">BATTLE BEGINS!</h1>
+        <div id="score-board">
+            TEAM PLAYER: <span id="p-count">0</span> | TEAM MONSTER: <span id="m-count">0</span>
+        </div>
+        <div id="instruction">Type !join player or !join monster</div>
     </div>
 
     <script src="game.js"></script>
