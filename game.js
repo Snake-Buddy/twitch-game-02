@@ -25,6 +25,18 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // Left Cliff Marker
+const cliffLeftGeo = new THREE.BoxGeometry(1, 5, 4);
+const cliffMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
+const cliffLeft = new THREE.Mesh(cliffLeftGeo, cliffMat);
+cliffLeft.position.set(-11, 1, 0);
+scene.add(cliffLeft);
+
+// Right Cliff Marker
+const cliffRight = cliffLeft.clone();
+cliffRight.position.set(11, 1, 0);
+scene.add(cliffRight);
+
     // Light
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     const sun = new THREE.DirectionalLight(0xffffff, 1);
@@ -39,21 +51,23 @@ function init() {
     scene.add(road);
 
     // Load Models
-    loader.load('models/knight.glb', (gltf) => {
-        playerModel = gltf.scene;
-        playerModel.scale.set(0.8, 0.8, 0.8);
-        scene.add(playerModel);
-        mixerPlayer = new THREE.AnimationMixer(playerModel);
-        if(gltf.animations[0]) mixerPlayer.clipAction(gltf.animations[0]).play();
-    });
+   // Load Player (Placeholder: Robot)
+loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/RobotExpressive/RobotExpressive.glb', (gltf) => {
+    playerModel = gltf.scene;
+    playerModel.scale.set(0.4, 0.4, 0.4); // This model is huge, so we scale it down
+    scene.add(playerModel);
+    mixerPlayer = new THREE.AnimationMixer(playerModel);
+    if(gltf.animations.length > 0) mixerPlayer.clipAction(gltf.animations[0]).play(); 
+});
 
-    loader.load('models/monster.glb', (gltf) => {
-        monsterModel = gltf.scene;
-        monsterModel.scale.set(1.1, 1.1, 1.1);
-        scene.add(monsterModel);
-        mixerMonster = new THREE.AnimationMixer(monsterModel);
-        if(gltf.animations[0]) mixerMonster.clipAction(gltf.animations[0]).play();
-    });
+// Load Monster (Placeholder: Flamingos/Birds often used for testing)
+loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Flamingo.glb', (gltf) => {
+    monsterModel = gltf.scene;
+    monsterModel.scale.set(0.01, 0.01, 0.01); // Scale for the Flamingo
+    scene.add(monsterModel);
+    mixerMonster = new THREE.AnimationMixer(monsterModel);
+    if(gltf.animations.length > 0) mixerMonster.clipAction(gltf.animations[0]).play();
+});
 }
 
 function push(amount, teamName) {
