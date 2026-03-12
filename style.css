@@ -1,1 +1,21 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0); /* Transparent for OBS */
+}
 
+#ui-container {
+    position: absolute;
+    top: 50px;
+    width: 100%;
+    text-align: center;
+    font-family: 'Arial Black', sans-serif;
+    color: white;
+    text-shadow: 4px 4px 0px #000;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#status-text { font-size: 4rem; margin: 0; color: #ff4500; }
+#score-board { font-size: 1.5rem; color: #ffd700; margin-top: 10px; }
+#instruction { font-size: 1rem; color: #ccc; font-style: italic; }
