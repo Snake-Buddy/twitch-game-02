@@ -2,7 +2,11 @@
 const TWITCH_CHANNEL = "YOUR_USERNAME_HERE";
 let gamePos = 0;
 const cliffLimit = 10;
-let playerModel, monsterModel;
+
+// Animation Variables
+let mixerPlayer, mixerMonster;
+let actionPlayer, actionMonster;
+const clock = new THREE.Clock();
 
 // --- SCENE SETUP ---
 const scene = new THREE.Scene();
@@ -12,8 +16,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(5, 10, 7);
 scene.add(sun);
@@ -21,54 +24,121 @@ scene.add(sun);
 // --- MODELS & ROAD ---
 const loader = new THREE.GLTFLoader();
 
-// Create the dirt road
-const roadGeo = new THREE.BoxGeometry(20, 0.5, 4);
+// Create the Road
+const roadGeo = new THREE.BoxGeometry(22, 0.5, 4);
 const roadMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
 const road = new THREE.Mesh(roadGeo, roadMat);
-road.position.y = -1;
+road.position.y = -1.1; 
 scene.add(road);
 
-// Load Characters
+// Load Player (Knight)
+let playerModel;
 loader.load('models/knight.glb', (gltf) => {
     playerModel = gltf.scene;
     playerModel.scale.set(0.8, 0.8, 0.8);
     scene.add(playerModel);
+
+    // Setup Animations
+    mixerPlayer = new THREE.AnimationMixer(playerModel);
+    // Assumes your model has an 'Idle' and 'Attack' animation
+    const idleAnim = THREE.AnimationClip.findByName(gltf.animations, 'Idle');
+    if(idleAnim) mixerPlayer.clipAction(idleAnim).play();
 });
 
+// Load Monster
+let monsterModel;
 loader.load('models/monster.glb', (gltf) => {
     monsterModel = gltf.scene;
-    monsterModel.scale.set(1, 1, 1);
+    monsterModel.scale.set(1.1, 1.1, 1.1);
     scene.add(monsterModel);
+
+    mixerMonster = new THREE.AnimationMixer(monsterModel);
+    const idleAnim = THREE.AnimationClip.findByName(gltf.animations, 'Idle');
+    if(idleAnim) mixerMonster.clipAction(idleAnim).play();
 });
 
-camera.position.set(0, 2, 10);
+camera.position.set(0, 2, 12);
 
 // --- CORE FUNCTIONS ---
-function push(amount) {
-    gamePos += amount;
-    new Audio('sounds/clash.mp3').play();
-    
-    if (Math.abs(gamePos) >= cliffLimit) {
-        new Audio('sounds/scream.mp3').play();
-        document.getElementById('status-text').innerText = gamePos > 0 ? "MONSTER WINS!" : "PLAYER WINS!";
-        gamePos = 0; // Reset
-        setTimeout(() => { document.getElementById('status-text').innerText = "BATTLE!"; }, 3000);
+function playAction(mixer, animations, name) {
+    const clip = THREE.AnimationClip.findByName(animations, name);
+    if (clip) {
+        const action = mixer.clipAction(clip);
+        action.reset().setLoop(THREE.LoopOnce).play();
+        action.clampWhenFinished = true;
     }
+}
+
+function push(amount, team) {
+    gamePos += amount;
+    
+    // Play sound
+    new Audio('sounds/clash.mp3').play();
+
+    // Trigger Attack Animations
+    if (team === 'player' && mixerPlayer) {
+        // Replace 'Attack' with whatever the animation name is in your .glb file
+        const attack = mixerPlayer.clipAction(mixerPlayer._root.animations[1]); 
+        attack.reset().setLoop(THREE.LoopOnce).play();
+    } 
+    if (team === 'monster' && mixerMonster) {
+        const attack = mixerMonster.clipAction(mixerMonster._root.animations[1]);
+        attack.reset().setLoop(THREE.LoopOnce).play();
+    }
+
+    // Check for Victory
+    if (Math.abs(gamePos) >= cliffLimit) {
+        victory(gamePos > 0 ? "MONSTER" : "PLAYER");
+    }
+}
+
+function victory(winner) {
+    new Audio('sounds/scream.mp3').play();
+    document.getElementById('status-text').innerText = `${winner} WINS!`;
+    
+    // Simple reset after 5 seconds
+    setTimeout(() => {
+        gamePos = 0;
+        document.getElementById('status-text').innerText = "BATTLE!";
+    }, 5000);
 }
 
 // --- TWITCH INTEGRATION ---
 ComfyJS.onChat = (user, message) => {
-    if (message === "!player") push(-0.2);
-    if (message === "!monster") push(0.2);
+    const msg = message.toLowerCase();
+    if (msg === "!player") push(-0.3, 'player');
+    if (msg === "!monster") push(0.3, 'monster');
 };
 
-// Start everything
+// Scale push power for bits
+ComfyJS.onCheer = (user, message, bits) => {
+    // 100 bits = 1.0 push power
+    const power = bits / 100;
+    // Determine team (this assumes users have "joined" a team previously)
+    // For now, let's just push based on a keyword in the cheer message
+    if (message.includes("monster")) push(power, 'monster');
+    else push(-power, 'player');
+};
+
 ComfyJS.Init(TWITCH_CHANNEL);
 
+// --- RENDER LOOP ---
 function animate() {
     requestAnimationFrame(animate);
-    if (playerModel) playerModel.position.x = gamePos - 2;
-    if (monsterModel) monsterModel.position.x = gamePos + 2;
+    const delta = clock.getDelta();
+
+    // Update Animations
+    if (mixerPlayer) mixerPlayer.update(delta);
+    if (mixerMonster) mixerMonster.update(delta);
+
+    // Update Model Positions
+    if (playerModel) playerModel.position.x = gamePos - 1.5;
+    if (monsterModel) {
+        monsterModel.position.x = gamePos + 1.5;
+        monsterModel.rotation.y = -Math.PI / 2; // Keep monster facing player
+    }
+    if (playerModel) playerModel.rotation.y = Math.PI / 2; // Keep player facing monster
+
     renderer.render(scene, camera);
 }
 animate();
