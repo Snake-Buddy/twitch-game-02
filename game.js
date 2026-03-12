@@ -90,22 +90,44 @@ function victory(winner) {
 
 // --- TWITCH INTEGRATION ---
 
+// --- COMMAND LIST ---
+const gameCommands = `
+  ⚔️ TUG-O-WAR COMMANDS: 
+  !join player - Join the Human team. 
+  !join monster - Join the Monster team. 
+  Any chat message pushes for your team! 
+  Follows/Subs/Bits give massive power boosts!
+`;
+
 ComfyJS.onChat = (user, message, flags, self, extra) => {
     const msg = message.toLowerCase();
 
-    // 1. Join Logic
+    // Help Command
+    if (msg === "!help" || msg === "!commands") {
+        ComfyJS.Say(gameCommands);
+        return;
+    }
+
+    // Join Logic
     if (msg === "!join player") {
         teams.monsters.delete(user);
         teams.players.add(user);
         updateUI();
+        console.log(`${user} joined Team Player`);
         return;
     }
     if (msg === "!join monster") {
         teams.players.delete(user);
         teams.monsters.add(user);
         updateUI();
+        console.log(`${user} joined Team Monster`);
         return;
     }
+
+    // Passive push for active chatters
+    if (teams.players.has(user)) push(-0.05, 'player');
+    if (teams.monsters.has(user)) push(0.05, 'monster');
+};
 
     // 2. Action Logic (If they are already in a team)
     if (teams.players.has(user)) push(-0.1, 'player');
