@@ -156,13 +156,29 @@ function animate() {
     if (mixerPlayer) mixerPlayer.update(delta);
     if (mixerMonster) mixerMonster.update(delta);
 
+    // Standard positioning
     if (playerModel) {
         playerModel.position.x = gamePos - 1.5;
-        playerModel.rotation.y = Math.PI / 2;
+        // Gravity effect: if pushed past -10, start falling on Y axis
+        if (gamePos <= -cliffLimit) {
+            playerModel.position.y -= 0.2; 
+            playerModel.rotation.z += 0.1; // Spin while falling
+        } else {
+            playerModel.position.y = 0;
+            playerModel.rotation.z = 0;
+        }
     }
+
     if (monsterModel) {
         monsterModel.position.x = gamePos + 1.5;
-        monsterModel.rotation.y = -Math.PI / 2;
+        // Gravity effect: if pushed past 10, start falling on Y axis
+        if (gamePos >= cliffLimit) {
+            monsterModel.position.y -= 0.2;
+            monsterModel.rotation.z -= 0.1;
+        } else {
+            monsterModel.position.y = 0;
+            monsterModel.rotation.z = 0;
+        }
     }
 
     renderer.render(scene, camera);
