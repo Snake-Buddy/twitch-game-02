@@ -19,3 +19,48 @@ body {
 #status-text { font-size: 4rem; margin: 0; color: #ff4500; }
 #score-board { font-size: 1.5rem; color: #ffd700; margin-top: 10px; }
 #instruction { font-size: 1rem; color: #ccc; font-style: italic; }
+
+#meter-container {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#meter-track {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #fff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#meter-bar {
+    position: absolute;
+    left: 50%; /* Start at center */
+    width: 4px; /* Tiny dot representing the struggle */
+    height: 100%;
+    background: #ffd700;
+    box-shadow: 0 0 10px #ffd700;
+    transition: left 0.2s ease-out;
+}
+
+#center-line {
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+#marker-left, #marker-right {
+    font-size: 1rem;
+    color: #ff4500;
+    font-weight: bold;
+}
