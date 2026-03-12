@@ -1,79 +1,86 @@
-// --- CONFIG & GLOBALS ---
-const TWITCH_CHANNEL = "YOUR_USERNAME_HERE";
+// --- CONFIG ---
+const TWITCH_CHANNEL = "YOUR_CHANNEL_NAME"; 
 let gamePos = 0;
 const cliffLimit = 10;
+const teams = { players: new Set(), monsters: new Set() };
 
-// Team Tracking
-const teams = {
-    players: new Set(),
-    monsters: new Set()
-};
-
-// Animation & Three.js Globals
-let mixerPlayer, mixerMonster;
-let playerModel, monsterModel;
+// Three.js Globals
+let scene, camera, renderer, mixerPlayer, mixerMonster, playerModel, monsterModel;
 const clock = new THREE.Clock();
-
-// --- SCENE SETUP ---
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
-// Lighting
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(5, 10, 7);
-scene.add(sun);
-
-// --- MODELS & ROAD ---
 const loader = new THREE.GLTFLoader();
 
-// Dirt Road
-const roadGeo = new THREE.BoxGeometry(22, 0.5, 4);
-const roadMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
-const road = new THREE.Mesh(roadGeo, roadMat);
-road.position.y = -1.1; 
-scene.add(road);
+// Audio
+const sfxClash = new Audio('sounds/clash.mp3');
+const sfxScream = new Audio('sounds/scream.mp3');
 
-// Load Models
-loader.load('models/knight.glb', (gltf) => {
-    playerModel = gltf.scene;
-    playerModel.scale.set(0.8, 0.8, 0.8);
-    scene.add(playerModel);
-    mixerPlayer = new THREE.AnimationMixer(playerModel);
-    if(gltf.animations[0]) mixerPlayer.clipAction(gltf.animations[0]).play(); // Default Idle
-});
+init();
+animate();
 
-loader.load('models/monster.glb', (gltf) => {
-    monsterModel = gltf.scene;
-    monsterModel.scale.set(1.1, 1.1, 1.1);
-    scene.add(monsterModel);
-    mixerMonster = new THREE.AnimationMixer(monsterModel);
-    if(gltf.animations[0]) mixerMonster.clipAction(gltf.animations[0]).play(); // Default Idle
-});
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2, 12);
 
-camera.position.set(0, 2, 12);
+    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-// --- CORE FUNCTIONS ---
+    // Light
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(5, 10, 7);
+    scene.add(sun);
+
+    // The Road
+    const roadGeo = new THREE.BoxGeometry(22, 0.5, 4);
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.position.y = -1.1;
+    scene.add(road);
+
+    // Load Models
+    loader.load('models/knight.glb', (gltf) => {
+        playerModel = gltf.scene;
+        playerModel.scale.set(0.8, 0.8, 0.8);
+        scene.add(playerModel);
+        mixerPlayer = new THREE.AnimationMixer(playerModel);
+        if(gltf.animations[0]) mixerPlayer.clipAction(gltf.animations[0]).play();
+    });
+
+    loader.load('models/monster.glb', (gltf) => {
+        monsterModel = gltf.scene;
+        monsterModel.scale.set(1.1, 1.1, 1.1);
+        scene.add(monsterModel);
+        mixerMonster = new THREE.AnimationMixer(monsterModel);
+        if(gltf.animations[0]) mixerMonster.clipAction(gltf.animations[0]).play();
+    });
+}
 
 function push(amount, teamName) {
     gamePos += amount;
-    
-    // Play sound and trigger animation
-    new Audio('sounds/clash.mp3').play();
+    sfxClash.currentTime = 0;
+    sfxClash.play();
 
+    // Trigger Animations (Plays the 2nd clip, usually "Attack")
     if (teamName === 'player' && mixerPlayer) {
-        const action = mixerPlayer.clipAction(THREE.AnimationClip.findByName(playerModel.animations, 'Attack') || playerModel.animations[1]);
+        const action = mixerPlayer.clipAction(playerModel.animations[1] || playerModel.animations[0]);
         action.reset().setLoop(THREE.LoopOnce).play();
-    } else if (teamName === 'monster' && mixerMonster) {
-        const action = mixerMonster.clipAction(THREE.AnimationClip.findByName(monsterModel.animations, 'Attack') || monsterModel.animations[1]);
+    } 
+    if (teamName === 'monster' && mixerMonster) {
+        const action = mixerMonster.clipAction(monsterModel.animations[1] || monsterModel.animations[0]);
         action.reset().setLoop(THREE.LoopOnce).play();
     }
 
     if (Math.abs(gamePos) >= cliffLimit) victory(gamePos > 0 ? "MONSTER" : "PLAYER");
-    updateUI();
+}
+
+function victory(winner) {
+    sfxScream.play();
+    document.getElementById('status-text').innerText = `${winner} WINS!`;
+    setTimeout(() => {
+        gamePos = 0;
+        document.getElementById('status-text').innerText = "BATTLE!";
+    }, 5000);
 }
 
 function updateUI() {
@@ -81,106 +88,60 @@ function updateUI() {
     document.getElementById('m-count').innerText = teams.monsters.size;
 }
 
-function victory(winner) {
-    new Audio('sounds/scream.mp3').play();
-    document.getElementById('status-text').innerText = `${winner} WINS!`;
-    gamePos = 0;
-    setTimeout(() => { document.getElementById('status-text').innerText = "BATTLE!"; }, 5000);
-}
-
-// --- TWITCH INTEGRATION ---
-
-// --- COMMAND LIST ---
-const gameCommands = `
-  ⚔️ TUG-O-WAR COMMANDS: 
-  !join player - Join the Human team. 
-  !join monster - Join the Monster team. 
-  Any chat message pushes for your team! 
-  Follows/Subs/Bits give massive power boosts!
-`;
-
-ComfyJS.onChat = (user, message, flags, self, extra) => {
+// --- TWITCH LOGIC ---
+ComfyJS.onChat = (user, message, flags) => {
     const msg = message.toLowerCase();
-
-    // Help Command
-    if (msg === "!help" || msg === "!commands") {
-        ComfyJS.Say(gameCommands);
-        return;
+    
+    if (msg === "!help") {
+        ComfyJS.Say(`Join a team with !join player or !join monster. Chat to push!`);
     }
 
-    // Join Logic
     if (msg === "!join player") {
         teams.monsters.delete(user);
         teams.players.add(user);
         updateUI();
-        console.log(`${user} joined Team Player`);
         return;
     }
     if (msg === "!join monster") {
         teams.players.delete(user);
         teams.monsters.add(user);
         updateUI();
-        console.log(`${user} joined Team Monster`);
         return;
     }
 
-    // Passive push for active chatters
-    if (teams.players.has(user)) push(-0.05, 'player');
-    if (teams.monsters.has(user)) push(0.05, 'monster');
-};
-
-    // 2. Action Logic (If they are already in a team)
     if (teams.players.has(user)) push(-0.1, 'player');
     if (teams.monsters.has(user)) push(0.1, 'monster');
 };
 
-// Automatic push for Follows/Subs
-ComfyJS.onFollow = (user) => {
-    // If a new follower isn't on a team, maybe give the Player team a boost by default
-    push(-0.5, 'player'); 
-};
-
-ComfyJS.onSub = (user, msg, subTier) => {
-    const power = subTier === "3000" ? 5 : 2; // Tier 3 gets a massive 5-unit push
-    if (teams.monsters.has(user)) push(power, 'monster');
-    else push(-power, 'player');
+// Mod Reset Command
+ComfyJS.onCommand = (user, command, message, flags) => {
+    if (flags.broadcaster || flags.mod) {
+        if (command === "resetgame") {
+            gamePos = 0;
+            document.getElementById('status-text').innerText = "GAME RESET";
+        }
+    }
 };
 
 ComfyJS.Init(TWITCH_CHANNEL);
 
-// --- RENDER LOOP ---
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
-
     if (mixerPlayer) mixerPlayer.update(delta);
     if (mixerMonster) mixerMonster.update(delta);
 
-    // Standard positioning
     if (playerModel) {
         playerModel.position.x = gamePos - 1.5;
-        // Gravity effect: if pushed past -10, start falling on Y axis
-        if (gamePos <= -cliffLimit) {
-            playerModel.position.y -= 0.2; 
-            playerModel.rotation.z += 0.1; // Spin while falling
-        } else {
-            playerModel.position.y = 0;
-            playerModel.rotation.z = 0;
-        }
+        playerModel.rotation.y = Math.PI / 2;
+        if (gamePos <= -cliffLimit) { playerModel.position.y -= 0.1; playerModel.rotation.z += 0.1; }
+        else { playerModel.position.y = 0; playerModel.rotation.z = 0; }
     }
-
     if (monsterModel) {
         monsterModel.position.x = gamePos + 1.5;
-        // Gravity effect: if pushed past 10, start falling on Y axis
-        if (gamePos >= cliffLimit) {
-            monsterModel.position.y -= 0.2;
-            monsterModel.rotation.z -= 0.1;
-        } else {
-            monsterModel.position.y = 0;
-            monsterModel.rotation.z = 0;
-        }
+        monsterModel.rotation.y = -Math.PI / 2;
+        if (gamePos >= cliffLimit) { monsterModel.position.y -= 0.1; monsterModel.rotation.z -= 0.1; }
+        else { monsterModel.position.y = 0; monsterModel.rotation.z = 0; }
     }
-
     renderer.render(scene, camera);
 }
-animate();
