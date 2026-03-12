@@ -1,5 +1,5 @@
 // --- CONFIG ---
-const TWITCH_CHANNEL = "YOUR_CHANNEL_NAME"; 
+const TWITCH_CHANNEL = "snake_buddy"; 
 let gamePos = 0;
 const cliffLimit = 10;
 const teams = { players: new Set(), monsters: new Set() };
@@ -86,6 +86,15 @@ function victory(winner) {
 function updateUI() {
     document.getElementById('p-count').innerText = teams.players.size;
     document.getElementById('m-count').innerText = teams.monsters.size;
+
+    // Calculate percentage: 
+    // -10 becomes 0%, 0 becomes 50%, 10 becomes 100%
+    const percentage = ((gamePos + cliffLimit) / (cliffLimit * 2)) * 100;
+    
+    // Clamp the value so the UI doesn't break if someone is pushed way off
+    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+    
+    document.getElementById('meter-bar').style.left = `${clampedPercentage}%`;
 }
 
 // --- TWITCH LOGIC ---
