@@ -3,9 +3,15 @@ const TWITCH_CHANNEL = "YOUR_USERNAME_HERE";
 let gamePos = 0;
 const cliffLimit = 10;
 
-// Animation Variables
+// Team Tracking
+const teams = {
+    players: new Set(),
+    monsters: new Set()
+};
+
+// Animation & Three.js Globals
 let mixerPlayer, mixerMonster;
-let actionPlayer, actionMonster;
+let playerModel, monsterModel;
 const clock = new THREE.Clock();
 
 // --- SCENE SETUP ---
@@ -24,99 +30,97 @@ scene.add(sun);
 // --- MODELS & ROAD ---
 const loader = new THREE.GLTFLoader();
 
-// Create the Road
+// Dirt Road
 const roadGeo = new THREE.BoxGeometry(22, 0.5, 4);
 const roadMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
 const road = new THREE.Mesh(roadGeo, roadMat);
 road.position.y = -1.1; 
 scene.add(road);
 
-// Load Player (Knight)
-let playerModel;
+// Load Models
 loader.load('models/knight.glb', (gltf) => {
     playerModel = gltf.scene;
     playerModel.scale.set(0.8, 0.8, 0.8);
     scene.add(playerModel);
-
-    // Setup Animations
     mixerPlayer = new THREE.AnimationMixer(playerModel);
-    // Assumes your model has an 'Idle' and 'Attack' animation
-    const idleAnim = THREE.AnimationClip.findByName(gltf.animations, 'Idle');
-    if(idleAnim) mixerPlayer.clipAction(idleAnim).play();
+    if(gltf.animations[0]) mixerPlayer.clipAction(gltf.animations[0]).play(); // Default Idle
 });
 
-// Load Monster
-let monsterModel;
 loader.load('models/monster.glb', (gltf) => {
     monsterModel = gltf.scene;
     monsterModel.scale.set(1.1, 1.1, 1.1);
     scene.add(monsterModel);
-
     mixerMonster = new THREE.AnimationMixer(monsterModel);
-    const idleAnim = THREE.AnimationClip.findByName(gltf.animations, 'Idle');
-    if(idleAnim) mixerMonster.clipAction(idleAnim).play();
+    if(gltf.animations[0]) mixerMonster.clipAction(gltf.animations[0]).play(); // Default Idle
 });
 
 camera.position.set(0, 2, 12);
 
 // --- CORE FUNCTIONS ---
-function playAction(mixer, animations, name) {
-    const clip = THREE.AnimationClip.findByName(animations, name);
-    if (clip) {
-        const action = mixer.clipAction(clip);
-        action.reset().setLoop(THREE.LoopOnce).play();
-        action.clampWhenFinished = true;
-    }
-}
 
-function push(amount, team) {
+function push(amount, teamName) {
     gamePos += amount;
     
-    // Play sound
+    // Play sound and trigger animation
     new Audio('sounds/clash.mp3').play();
 
-    // Trigger Attack Animations
-    if (team === 'player' && mixerPlayer) {
-        // Replace 'Attack' with whatever the animation name is in your .glb file
-        const attack = mixerPlayer.clipAction(mixerPlayer._root.animations[1]); 
-        attack.reset().setLoop(THREE.LoopOnce).play();
-    } 
-    if (team === 'monster' && mixerMonster) {
-        const attack = mixerMonster.clipAction(mixerMonster._root.animations[1]);
-        attack.reset().setLoop(THREE.LoopOnce).play();
+    if (teamName === 'player' && mixerPlayer) {
+        const action = mixerPlayer.clipAction(THREE.AnimationClip.findByName(playerModel.animations, 'Attack') || playerModel.animations[1]);
+        action.reset().setLoop(THREE.LoopOnce).play();
+    } else if (teamName === 'monster' && mixerMonster) {
+        const action = mixerMonster.clipAction(THREE.AnimationClip.findByName(monsterModel.animations, 'Attack') || monsterModel.animations[1]);
+        action.reset().setLoop(THREE.LoopOnce).play();
     }
 
-    // Check for Victory
-    if (Math.abs(gamePos) >= cliffLimit) {
-        victory(gamePos > 0 ? "MONSTER" : "PLAYER");
-    }
+    if (Math.abs(gamePos) >= cliffLimit) victory(gamePos > 0 ? "MONSTER" : "PLAYER");
+    updateUI();
+}
+
+function updateUI() {
+    document.getElementById('p-count').innerText = teams.players.size;
+    document.getElementById('m-count').innerText = teams.monsters.size;
 }
 
 function victory(winner) {
     new Audio('sounds/scream.mp3').play();
     document.getElementById('status-text').innerText = `${winner} WINS!`;
-    
-    // Simple reset after 5 seconds
-    setTimeout(() => {
-        gamePos = 0;
-        document.getElementById('status-text').innerText = "BATTLE!";
-    }, 5000);
+    gamePos = 0;
+    setTimeout(() => { document.getElementById('status-text').innerText = "BATTLE!"; }, 5000);
 }
 
 // --- TWITCH INTEGRATION ---
-ComfyJS.onChat = (user, message) => {
+
+ComfyJS.onChat = (user, message, flags, self, extra) => {
     const msg = message.toLowerCase();
-    if (msg === "!player") push(-0.3, 'player');
-    if (msg === "!monster") push(0.3, 'monster');
+
+    // 1. Join Logic
+    if (msg === "!join player") {
+        teams.monsters.delete(user);
+        teams.players.add(user);
+        updateUI();
+        return;
+    }
+    if (msg === "!join monster") {
+        teams.players.delete(user);
+        teams.monsters.add(user);
+        updateUI();
+        return;
+    }
+
+    // 2. Action Logic (If they are already in a team)
+    if (teams.players.has(user)) push(-0.1, 'player');
+    if (teams.monsters.has(user)) push(0.1, 'monster');
 };
 
-// Scale push power for bits
-ComfyJS.onCheer = (user, message, bits) => {
-    // 100 bits = 1.0 push power
-    const power = bits / 100;
-    // Determine team (this assumes users have "joined" a team previously)
-    // For now, let's just push based on a keyword in the cheer message
-    if (message.includes("monster")) push(power, 'monster');
+// Automatic push for Follows/Subs
+ComfyJS.onFollow = (user) => {
+    // If a new follower isn't on a team, maybe give the Player team a boost by default
+    push(-0.5, 'player'); 
+};
+
+ComfyJS.onSub = (user, msg, subTier) => {
+    const power = subTier === "3000" ? 5 : 2; // Tier 3 gets a massive 5-unit push
+    if (teams.monsters.has(user)) push(power, 'monster');
     else push(-power, 'player');
 };
 
@@ -127,17 +131,17 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
-    // Update Animations
     if (mixerPlayer) mixerPlayer.update(delta);
     if (mixerMonster) mixerMonster.update(delta);
 
-    // Update Model Positions
-    if (playerModel) playerModel.position.x = gamePos - 1.5;
+    if (playerModel) {
+        playerModel.position.x = gamePos - 1.5;
+        playerModel.rotation.y = Math.PI / 2;
+    }
     if (monsterModel) {
         monsterModel.position.x = gamePos + 1.5;
-        monsterModel.rotation.y = -Math.PI / 2; // Keep monster facing player
+        monsterModel.rotation.y = -Math.PI / 2;
     }
-    if (playerModel) playerModel.rotation.y = Math.PI / 2; // Keep player facing monster
 
     renderer.render(scene, camera);
 }
